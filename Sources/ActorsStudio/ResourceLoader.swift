@@ -15,15 +15,29 @@ public actor DataLoader {
         case fetched(Data, Sendable)
     }
     
-    nonisolated(unsafe) private var datas: [URLRequest: LoaderStatus] = [:]
+    nonisolated(unsafe) private var loaders: [URLRequest: LoaderStatus] = [:]
     private let lock = NSLock()
+    private var decoders: [Any.Type : any DataDecoder]
     
     public let cacheToFile = false
+    var urlSession: URLSession
+
+    public init(urlSession: URLSession = .shared) {
+        self.urlSession = urlSession
+    }
     
     nonisolated
     public func peek<S: Sendable>(_ url: URL, as type: S.Type = S.self) -> S? {
+        peek(URLRequest(url: url), as: type)
+    }
+    
+    nonisolated
+    public func peek<S: Sendable>(
+        _ urlRequest: URLRequest,
+        as type: S.Type = S.self
+    ) -> S? {
         lock.withLock {
-            guard case let .fetched(data, value) = datas[URLRequest(url: url)]
+            guard case let .fetched(data, value) = loaders[urlRequest]
             else { return nil }
             return (data as? S) ?? (value as? S)
         }
@@ -40,7 +54,7 @@ public actor DataLoader {
         _ urlRequest: URLRequest,
         builder: @Sendable @escaping (Data) throws -> S
     ) async throws -> S {
-        let status = lock.withLock { self.datas[urlRequest] }
+        let status = lock.withLock { self.loaders[urlRequest] }
         if let status {
             switch status {
             case let .fetched(data, value):
@@ -54,24 +68,24 @@ public actor DataLoader {
         if let data = try self.dataFromFileSystem(for: urlRequest) {
             let value = try builder(data)
             lock.withLock {
-                self.datas[urlRequest] = .fetched(data, value)
+                self.loaders[urlRequest] = .fetched(data, value)
             }
             return value
         }
         
         let task: Task<Data, Error> = Task {
-            let (data, _) = try await URLSession.shared.data(for: urlRequest)
+            let (data, _) = try await urlSession.data(for: urlRequest)
             try self.persistData(data, for: urlRequest)
             return data
         }
         
         lock.withLock {
-            datas[urlRequest] = .inProgress(task)
+            loaders[urlRequest] = .inProgress(task)
         }
         let data = try await task.value
         let value = try builder(data)
         lock.withLock {
-            datas[urlRequest] = .fetched(data, value)
+            loaders[urlRequest] = .fetched(data, value)
         }
         
         return value
@@ -114,55 +128,3 @@ extension DataLoader {
         return applicationSupport.appendingPathComponent(fileName)
     }
 }
-
-// MARK:
-import SwiftUI
-
-extension EnvironmentValues {
-    @Entry var dataLoader: DataLoader?
-}
-
-struct RemoteImage: View {
-    private let source: URLRequest
-    @State private var image: Image?
-
-    @Environment(\.dataLoader) private var dataLoader
-
-    init(source: URL) {
-        self.init(source: URLRequest(url: source))
-    }
-
-    init(source: URLRequest) {
-        self.source = source
-    }
-
-    var body: some View {
-        Group {
-//            if let data = data {
-//                Data(Data: data)
-//            } else {
-                Rectangle()
-                    .background(Color.red)
-//            }
-        }
-        .task {
-            let it = try? await dataLoader?.fetch(source) { data in
-                Image("")
-            }
-            await loadData(at: source)
-        }
-    }
-
-    func loadData(at source: URLRequest) async {
-        do {
-            let it = try await dataLoader?.fetch(source) { data in
-                Image("")
-//                image = Image(uiImage: CGImage(data: $0)!)
-            }
-        } catch {
-            print(error)
-        }
-    }
-}
-
-extension Data: Sendable {}

@@ -16,12 +16,20 @@ let package = Package(
         .library(
             name: "ActorsStudio",
             targets: ["ActorsStudio"]),
+        
+        .library(
+            name: "Examples",
+            targets: ["ActorsStudio", "Examples"]),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "ActorsStudio"),
+        .target(
+            name: "Examples",
+            dependencies: ["ActorsStudio"]
+        ),
         .testTarget(
             name: "ActorsStudioTests",
             dependencies: ["ActorsStudio"]

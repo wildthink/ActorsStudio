@@ -43,16 +43,15 @@ public struct Resource<Value: Sendable>: @preconcurrency DynamicProperty
     }
 }
 
+// MARK: Environment Hook
+public extension EnvironmentValues {
+    @Entry var dataLoader: DataLoader?
+}
 
 public extension View {
-    
     func dataLoader(_ cache: DataLoader) -> some View {
         environment(\.dataLoader, cache)
     }
-    
-//    func resourceCache(_ cache: ResourceCache) -> some View {
-//        environment(\.resourceCache, cache)
-//    }
 }
 
 extension Resource {
