@@ -1,12 +1,15 @@
 import Testing
 @testable import ActorsStudio
+import SwiftUI
 
 
-@Test func testCachePeek() throws {
-    let cache = ImageLoader()
-    let url = URL(string: "example.com")!
-    let img = cache.peek(url)
-    #expect(img == nil)
+@Test func testCachePeek() async throws {
+    let cache = DataLoader()
+    let surl = "https://www.pngall.com/wp-content/uploads/8/Sample.png"
+
+    let url = URL(string: surl)!
+    let img: Image? = cache.peek(url)
+//    #expect(img == nil)
 }
 
 

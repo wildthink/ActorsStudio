@@ -8,23 +8,54 @@
 
 import Foundation
 
-public struct DataDecoder<Value: Sendable>: Sendable {
-    public typealias Value = Value
-    public typealias Decoder = @Sendable (Data) throws -> Value
-    
-    let _decode: Decoder
+public struct DataDecoder: Sendable {
 
-    init(decoder: @escaping Decoder) {
+    let valueType: Any.Type
+    let _decode: @Sendable (Data) throws -> Any
+
+    init<S>(decoder: @escaping @Sendable (Data) throws -> S) {
         self._decode = decoder
+        self.valueType = S.self
     }
     
-    func decode(_ data: Data) throws -> Value {
-        try _decode(data)
+    func decode<S>(_ data: Data) throws -> S {
+       guard let it = try _decode(data) as? S
+       else {
+           throw DataDecoderError.failedToDecode(valueType)
+       }
+       return it
     }
 }
 
-public extension DataDecoder where Value: Sendable & Decodable {
-    static var decodable: DataDecoder {
-        DataDecoder { try JSONDecoder().decode(Value.self, from: $0) }
+public enum DataDecoderError: Error {
+    case failedToDecode(Any.Type)
+}
+
+import SwiftUI
+
+#if os(macOS)
+import AppKit
+public extension Image {
+    @Sendable init(data: Data) {
+        self = if let it = NSImage(data: data) {
+            Self.init(nsImage: it)
+        } else {
+            Image(systemName: "circle.slash")
+        }
     }
 }
+#endif
+
+#if os(iOS)
+import UIKit
+
+public extension Image {
+    @Sendable init(data: Data) {
+        self = if let it = UIImage(data: data) {
+            Self.init(uiImage: it)
+        } else {
+            Image(systemName: "circle.slash")
+        }
+    }
+}
+#endif

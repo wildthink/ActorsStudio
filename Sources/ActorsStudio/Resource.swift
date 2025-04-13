@@ -1,12 +1,4 @@
 //
-//  ResourceProvider.swift
-//  ActorsStudio
-//
-//  Created by Jason Jobe on 4/11/25.
-//
-
-
-//
 //  Resource.swift
 //
 //  Created by Jason Jobe on 1/2/25.
@@ -20,7 +12,7 @@ import SwiftUI
 @propertyWrapper
 public struct Resource<Value: Sendable>: @preconcurrency DynamicProperty
 {
-    @Environment(\.dataLoader) private var dataLoader
+    @Environment(\.resourceLoader) private var resourceLoader
     @StateObject private var tracker: Tracker<Value> = .init()
     var url: URL?
     
@@ -35,7 +27,7 @@ public struct Resource<Value: Sendable>: @preconcurrency DynamicProperty
     }
     
     public func update() {
-        tracker.cache = dataLoader
+        tracker.cache = resourceLoader
         tracker.url = url
     }
     public var projectedValue: Tracker<Value> {
@@ -45,12 +37,12 @@ public struct Resource<Value: Sendable>: @preconcurrency DynamicProperty
 
 // MARK: Environment Hook
 public extension EnvironmentValues {
-    @Entry var dataLoader: DataLoader?
+    @Entry var resourceLoader: ResourceLoader = DataLoader()
 }
 
 public extension View {
-    func dataLoader(_ cache: DataLoader) -> some View {
-        environment(\.dataLoader, cache)
+    func resourceLoader(_ cache: ResourceLoader) -> some View {
+        environment(\.resourceLoader, cache)
     }
 }
 
@@ -58,7 +50,7 @@ extension Resource {
     
     @MainActor
     public final class Tracker<BoxValue: Sendable>: ObservableObject {
-        var cache: DataLoader?
+        var cache: ResourceLoader?
         public var value: BoxValue?
         public var url: URL? {
             didSet { load() }
@@ -69,8 +61,11 @@ extension Resource {
         }
         
         func report(error: Error) {
-            guard let url else { return }
-            print("Error loading \(url)\n\t: \(error.localizedDescription)")
+            if let url {
+                print("Error loading \(BoxValue.self)\n\tFrom \(url)\n\t: \(error.localizedDescription)")
+            } else {
+                print("Error loading \(BoxValue.self)\n\t: \(error.localizedDescription)")
+            }
         }
         
         func resetCache(with value: BoxValue) {
@@ -87,10 +82,9 @@ extension Resource {
             
             Task {
                 do {
-                    let value: BoxValue = try await cache.fetch(url) { _ in
-                        fatalError()
+                    if let value = try await cache.fetch(url, as: BoxValue.self) {
+                        resetCache(with: value)
                     }
-                    resetCache(with: value)
                 } catch {
                     report(error: error)
                 }
