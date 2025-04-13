@@ -69,18 +69,19 @@ extension Resource {
         }
         
         func resetCache(with value: BoxValue) {
+            task?.cancel()
+            task = nil
             objectWillChange.send()
             self.value = value
         }
         
+        var task: Task<Void, Never>?
+        
         public func load() {
-            guard let cache, let url else { return }
-
-            if let resource = cache.peek(url, as: BoxValue.self) {
-                resetCache(with: resource)
-            }
+            guard let cache, let url, task == nil
+            else { return }
             
-            Task {
+            task = Task {
                 do {
                     if let value = try await cache.fetch(url, as: BoxValue.self) {
                         resetCache(with: value)

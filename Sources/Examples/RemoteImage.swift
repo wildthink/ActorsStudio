@@ -20,7 +20,9 @@ struct RemoteImage: View {
         }
         .onAppear {
             $image.url = url
-            $image.load()
+        }
+        .task {
+//            $image.load()
         }
     }
 }
@@ -28,9 +30,12 @@ struct RemoteImage: View {
 let surl = "https://www.pngall.com/wp-content/uploads/8/Sample.png"
 
 #Preview {
-    ZStack {
+    VStack {
+        RemoteImage()
+        RemoteImage()
         RemoteImage()
     }
+    .resourceLoader(DataLoader())
     .frame(width: 300, height: 300)
     .padding()
 }
